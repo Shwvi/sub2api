@@ -368,10 +368,9 @@ func (s *RateLimitService) HandleUpstreamError(ctx context.Context, account *Acc
 		return true
 	}
 
-	// Anthropic official 5h / 7d window exhaustion is a hard account limit.
-	// It must take precedence over user-configured 429 temp-unsched rules,
-	// otherwise a broad "rate limit" keyword rule can shorten a multi-hour
-	// cooldown to a local temporary pause.
+	// Anthropic window exhaustion takes precedence over generic 429 rules.
+	// A per-account shared-weekly override permits retrying after a short cooldown;
+	// 5h and model-specific limits still retain their own reset times.
 	if statusCode == http.StatusTooManyRequests && account.Platform == PlatformAnthropic {
 		// Fable may be rejected because the organization has no usage credits for
 		// this model. Anthropic reports that as 429, but it is a model entitlement
@@ -383,6 +382,9 @@ func (s *RateLimitService) HandleUpstreamError(ctx context.Context, account *Acc
 			return false
 		}
 		if fableCreditsRequired || fableLimited {
+			return false
+		}
+		if s.applyAnthropicWeeklyOverride429(ctx, account, headers) {
 			return false
 		}
 	}
@@ -1238,6 +1240,10 @@ func (s *RateLimitService) handle429(ctx context.Context, account *Account, head
 		}
 	}
 
+	if s.applyAnthropicWeeklyOverride429(ctx, account, headers) {
+		return
+	}
+
 	// 2. Anthropic 平台：尝试解析 per-window 头（5h / 7d），选择实际触发的窗口
 	if result := calculateAnthropic429ResetTime(headers); result != nil {
 		s.notifyAccountSchedulingBlocked(account, result.resetAt, "429")
@@ -1511,7 +1517,7 @@ func (s *RateLimitService) persistAnthropicExhaustedWindowLimit(ctx context.Cont
 		return false
 	}
 	now := time.Now()
-	limit := selectAnthropicExhaustedWindow(headers, now)
+	limit := selectAnthropicAccountWindowLimit(account, headers, now)
 	if limit == nil {
 		return false
 	}

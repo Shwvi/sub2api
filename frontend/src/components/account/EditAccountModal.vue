@@ -2731,6 +2731,39 @@
           </p>
         </div>
 
+        <div class="rounded-lg border border-gray-200 p-4 dark:border-dark-600">
+          <div class="flex items-center justify-between gap-4">
+            <div>
+              <label id="anthropic-ignore-weekly-limit-label" class="input-label mb-0">
+                {{ t('admin.accounts.quotaControl.ignoreWeeklyLimit.label') }}
+              </label>
+              <p id="anthropic-ignore-weekly-limit-hint" class="mt-1 text-xs text-gray-500 dark:text-gray-400">
+                {{ t('admin.accounts.quotaControl.ignoreWeeklyLimit.hint') }}
+              </p>
+            </div>
+            <button
+              type="button"
+              role="switch"
+              :aria-checked="anthropicIgnoreWeeklyLimit"
+              aria-labelledby="anthropic-ignore-weekly-limit-label"
+              aria-describedby="anthropic-ignore-weekly-limit-hint"
+              data-testid="anthropic-ignore-weekly-limit"
+              @click="anthropicIgnoreWeeklyLimit = !anthropicIgnoreWeeklyLimit"
+              :class="[
+                'relative inline-flex h-6 w-11 flex-shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none focus:ring-2 focus:ring-primary-500 focus:ring-offset-2',
+                anthropicIgnoreWeeklyLimit ? 'bg-primary-600' : 'bg-gray-200 dark:bg-dark-600'
+              ]"
+            >
+              <span
+                :class="[
+                  'pointer-events-none inline-block h-5 w-5 transform rounded-full bg-white shadow ring-0 transition duration-200 ease-in-out',
+                  anthropicIgnoreWeeklyLimit ? 'translate-x-5' : 'translate-x-0'
+                ]"
+              />
+            </button>
+          </div>
+        </div>
+
         <!-- Window Cost Limit -->
         <div class="rounded-lg border border-gray-200 p-4 dark:border-dark-600">
           <div class="mb-3 flex items-center justify-between">
@@ -3816,6 +3849,7 @@ const mixedChannelWarningAction = ref<(() => Promise<void>) | null>(null)
 const antigravityMixedChannelConfirmed = ref(false)
 
 // Quota control state (Anthropic OAuth/SetupToken only)
+const anthropicIgnoreWeeklyLimit = ref(false)
 const windowCostEnabled = ref(false)
 const windowCostLimit = ref<number | null>(null)
 const windowCostStickyReserve = ref<number | null>(null)
@@ -5056,6 +5090,7 @@ function loadTempUnschedRules(credentials?: Record<string, unknown>) {
 // Load quota control settings from account (Anthropic OAuth/SetupToken only)
 function loadQuotaControlSettings(account: Account) {
   // Reset all quota control state first
+  anthropicIgnoreWeeklyLimit.value = false
   windowCostEnabled.value = false
   windowCostLimit.value = null
   windowCostStickyReserve.value = null
@@ -5084,6 +5119,8 @@ function loadQuotaControlSettings(account: Account) {
   if (account.type !== 'oauth' && account.type !== 'setup-token') {
     return
   }
+
+  anthropicIgnoreWeeklyLimit.value = account.extra?.anthropic_ignore_weekly_limit === true
 
   // Load from extra field (via backend DTO fields)
   if (account.window_cost_limit != null && account.window_cost_limit > 0) {
@@ -5780,6 +5817,7 @@ const handleSubmit = async () => {
     if (props.account.platform === 'anthropic' && (props.account.type === 'oauth' || props.account.type === 'setup-token')) {
       const currentExtra = (updatePayload.extra as Record<string, unknown>) || (props.account.extra as Record<string, unknown>) || {}
       const newExtra: Record<string, unknown> = { ...currentExtra }
+      newExtra.anthropic_ignore_weekly_limit = anthropicIgnoreWeeklyLimit.value
 
       // Window cost limit settings
       if (windowCostEnabled.value && windowCostLimit.value != null && windowCostLimit.value > 0) {

@@ -329,6 +329,95 @@ function mountModal(account = buildAccount(), renderGroupSelector = false) {
   })
 }
 
+describe('EditAccountModal Anthropic weekly limit override', () => {
+  function buildAnthropicAccount(type = 'oauth', extra: Record<string, unknown> = {}) {
+    return {
+      ...buildAccount(),
+      name: 'Claude subscription',
+      platform: 'anthropic',
+      type,
+      credentials: { access_token: 'test-token' },
+      extra
+    }
+  }
+
+  beforeEach(() => {
+    authIsSimpleMode.value = true
+    updateAccountMock.mockReset().mockImplementation(async (_id, payload) => payload)
+    checkMixedChannelRiskMock.mockReset().mockResolvedValue({ has_risk: false })
+  })
+
+  it.each(['oauth', 'setup-token'])('defaults to off and saves the enabled override for %s', async (type) => {
+    const account = buildAnthropicAccount(type, {
+      passive_usage_7d_utilization: 1,
+      passive_usage_7d_oi_utilization: 0.5,
+      custom_metadata: { label: 'keep me' }
+    })
+    const wrapper = mountModal(account)
+    const toggle = wrapper.get('[data-testid="anthropic-ignore-weekly-limit"]')
+    expect(toggle.attributes('aria-checked')).toBe('false')
+
+    await toggle.trigger('click')
+    await wrapper.get('form#edit-account-form').trigger('submit.prevent')
+
+    expect(updateAccountMock).toHaveBeenCalledTimes(1)
+    expect(updateAccountMock.mock.calls[0]?.[1]?.extra).toMatchObject({
+      ...account.extra,
+      anthropic_ignore_weekly_limit: true
+    })
+    expect(account.extra).not.toHaveProperty('anthropic_ignore_weekly_limit')
+    wrapper.unmount()
+  })
+
+  it.each(['oauth', 'setup-token'])('loads an enabled override and explicitly saves false when disabled for %s', async (type) => {
+    const account = buildAnthropicAccount(type, {
+      anthropic_ignore_weekly_limit: true,
+      passive_usage_7d_reset: 1793000000,
+      custom_metadata: { label: 'keep me' }
+    })
+    const wrapper = mountModal(account)
+    const toggle = wrapper.get('[data-testid="anthropic-ignore-weekly-limit"]')
+    expect(toggle.attributes('aria-checked')).toBe('true')
+
+    await toggle.trigger('click')
+    await wrapper.get('form#edit-account-form').trigger('submit.prevent')
+
+    expect(updateAccountMock).toHaveBeenCalledTimes(1)
+    expect(updateAccountMock.mock.calls[0]?.[1]?.extra).toMatchObject({
+      ...account.extra,
+      anthropic_ignore_weekly_limit: false
+    })
+    expect(account.extra.anthropic_ignore_weekly_limit).toBe(true)
+    wrapper.unmount()
+  })
+
+  it('resets the switch when another account is loaded', async () => {
+    const wrapper = mountModal(buildAnthropicAccount('oauth', { anthropic_ignore_weekly_limit: true }))
+    expect(wrapper.get('[data-testid="anthropic-ignore-weekly-limit"]').attributes('aria-checked')).toBe('true')
+
+    await wrapper.setProps({ account: { ...buildAnthropicAccount('setup-token'), id: 2 } })
+    expect(wrapper.get('[data-testid="anthropic-ignore-weekly-limit"]').attributes('aria-checked')).toBe('false')
+    wrapper.unmount()
+  })
+
+  it('does not expose or add the override for other platforms or Anthropic API key accounts', async () => {
+    for (const account of [
+      buildAccount(),
+      buildAntigravityAccount(),
+      { ...buildAnthropicAccount('apikey'), credentials: { api_key: 'sk-test' } }
+    ]) {
+      updateAccountMock.mockClear()
+      const wrapper = mountModal(account)
+      expect(wrapper.find('[data-testid="anthropic-ignore-weekly-limit"]').exists()).toBe(false)
+
+      await wrapper.get('form#edit-account-form').trigger('submit.prevent')
+      expect(updateAccountMock).toHaveBeenCalledTimes(1)
+      expect(updateAccountMock.mock.calls[0]?.[1]?.extra ?? {}).not.toHaveProperty('anthropic_ignore_weekly_limit')
+      wrapper.unmount()
+    }
+  })
+})
+
 describe('EditAccountModal', () => {
   beforeEach(() => {
     authIsSimpleMode.value = true

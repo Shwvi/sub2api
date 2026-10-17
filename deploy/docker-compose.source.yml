@@ -1,0 +1,9 @@
+# Overlay for self-hosting this checkout instead of the official image.
+# Use with docker-compose.local.yml; configure deploy/.env first.
+services:
+  sub2api:
+    image: sub2api-local:claude-weekly-override
+    pull_policy: build
+    build:
+      context: ..
+      dockerfile: deploy/Dockerfile

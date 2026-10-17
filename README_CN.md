@@ -202,6 +202,22 @@ underscores_in_headers on;
 
 Nginx 默认会丢弃名称中含下划线的请求头（如 `session_id`），这会导致多账号环境下的粘性会话功能失效。
 
+## Claude Code 周限后继续调度
+
+本分支为 Anthropic OAuth / Setup Token 账号增加了默认关闭的 **周限后继续调度** 开关。进入 **账号管理 → 编辑账号 → 配额控制** 即可设置；只对开启的账号生效，不需要数据库迁移。
+
+- 开启后，共享 `7d` 周用量快照达到阈值（包括 100%）时，账号仍参与调度，用量继续显示和记录。
+- 上游实际返回共享周限相关的 429 时，按系统的 **429 兜底冷却** 设置短暂回避（默认 5 秒），之后再尝试；请求的错误和故障转移照常处理，不会被伪装为成功。
+- 5 小时限额、Fable 的独立 `7d_oi` 模型限额、凭据失效和手动停调仍生效。该设置不会自动消费重置额度或修改上游订阅。
+- 开关不会自动清除已有冷却。对已经因周限暂停的账号，确认其暂停原因后可使用账号操作菜单的 **恢复状态**；此操作也会清理该账号其他临时限流状态。
+- 关闭开关后恢复原有周限处理。API 字段为账号 `extra.anthropic_ignore_weekly_limit`（布尔值），批量接口关闭时需显式发送 `false`。
+
+部署此功能需要从本分支构建镜像，官方镜像不包含该改动。先按下方部署说明配置 `deploy/.env` 和持久化目录，然后在仓库根目录执行：
+
+```bash
+docker compose --env-file deploy/.env -f deploy/docker-compose.local.yml -f deploy/docker-compose.source.yml up -d --build
+```
+
 ## Codex Fast/Flex 策略说明
 
 管理员后台的 `系统设置 -> 网关服务 -> OpenAI Fast/Flex 策略` 只负责处理请求体中的 `service_tier`，不会修改 Codex 客户端的模型目录，也不会让 Codex UI 自动出现 Speed 或 `/fast` 选项。

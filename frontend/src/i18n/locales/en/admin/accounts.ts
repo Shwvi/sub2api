@@ -1009,6 +1009,10 @@ export default {
       quotaControl: {
         title: 'Quota Control',
         hint: 'Configure cost window, session limits, client affinity and other scheduling controls.',
+        ignoreWeeklyLimit: {
+          label: 'Keep scheduling after the weekly limit',
+          hint: 'Ignore pauses triggered by shared 7d usage. Actual weekly-limit 429 responses use a short cooldown before retrying. The 5h limit, authentication failures, manual pauses, and the separate Fable weekly limit still apply. For an existing weekly pause, confirm its cause before using Recover State; this also clears other temporary rate limits.'
+        },
         windowCost: {
           label: '5h Window Cost Limit',
           hint: 'Limit account cost usage within the 5-hour window',

@@ -300,7 +300,7 @@ func anthropicThresholdCandidates(account *Account) []*accountSchedulingThreshol
 			until:       cloneTimePtr(account.SessionWindowEnd),
 		})
 	}
-	if usedPercent := utilizationAsPercent(account.Extra["passive_usage_7d_utilization"]); usedPercent > 0 {
+	if usedPercent := utilizationAsPercent(account.Extra["passive_usage_7d_utilization"]); usedPercent > 0 && !account.IgnoresAnthropicWeeklyLimit() {
 		candidates = append(candidates, &accountSchedulingThresholdCandidate{
 			window:      "7d",
 			usedPercent: usedPercent,
